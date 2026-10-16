@@ -1,5 +1,5 @@
 
-import unittest
+import pytest
 
 from app.evaluation import (
     calculate_claim_metrics,
@@ -24,7 +24,7 @@ def test_empty_evaluation():
 
 
 def test_mismatched_lengths():
-    with unittest.TestCase().assertRaises(ValueError):
+    with pytest.raises(ValueError):
         calculate_claim_metrics(["supported"], [])
 
 
@@ -43,7 +43,7 @@ def test_claim_rates():
 
 
 def test_claim_rates_reject_inconsistent_counts():
-    with unittest.TestCase().assertRaises(ValueError):
+    with pytest.raises(ValueError):
         calculate_claim_rates(
             total_claims=5,
             supported_claims=2,
