@@ -75,7 +75,7 @@ def test_verify_insufficient_evidence(evidence):
 
 
 
-def test_verify_rejects_invalid_evidence_id(evidence):
+def test_verify_repairs_invalid_evidence_id_when_matching_passage_exists(evidence):
     verifier = make_verifier({
         "status": "supported",
         "explanation": "Claim supported.",
@@ -88,8 +88,42 @@ def test_verify_rejects_invalid_evidence_id(evidence):
         claim_id=1,
     )
 
-    # Invalid citations must never leave the claim marked supported.
+    # The invalid ID is discarded; a matching supplied passage is selected.
+    assert result.status == "supported"
+    assert result.evidence_ids == [1]
+
+
+
+
+def test_repairs_missing_citation_when_evidence_contains_claim(evidence):
+    verifier = make_verifier({
+        "status": "supported",
+        "explanation": "The evidence supports the claim.",
+        "evidence_ids": [],
+    })
+
+    result = verifier.verify(
+        "Top management must demonstrate leadership and commitment.",
+        evidence,
+        claim_id=3,
+    )
+
+    assert result.status == "supported"
+    assert result.evidence_ids == [1]
+
+
+def test_missing_citation_without_matching_evidence_is_downgraded(evidence):
+    verifier = make_verifier({
+        "status": "supported",
+        "explanation": "No matching passage was cited.",
+        "evidence_ids": [],
+    })
+
+    result = verifier.verify(
+        "The chief executive has a private mobile telephone number.",
+        evidence,
+        claim_id=4,
+    )
+
     assert result.status == "insufficient_evidence"
     assert result.evidence_ids == []
-
-

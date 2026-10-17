@@ -1,28 +1,53 @@
 
-import faiss
 import importlib
+
+import faiss
 import numpy as np
 
 from app.config import EMBEDDING_MODEL
 
 
 class EvidenceRetriever:
-    def __init__(self, model_name: str = EMBEDDING_MODEL):
+    def __init__(
+        self,
+        model_name: str = EMBEDDING_MODEL,
+        min_similarity: float = 0.0,
+    ):
+        if not -1.0 <= min_similarity <= 1.0:
+            raise ValueError(
+                "min_similarity must be between -1.0 and 1.0."
+            )
+
         SentenceTransformer = importlib.import_module(
             "sentence_transformers"
         ).SentenceTransformer
+
         self.model = SentenceTransformer(model_name)
         self.index = None
         self.chunks = []
+        self.min_similarity = min_similarity
 
     def build_index(self, chunks: list[dict]) -> None:
         if not chunks:
-            raise ValueError("Cannot index an empty document collection.")
+            raise ValueError(
+                "Cannot index an empty document collection."
+            )
 
-        texts = [chunk["text"].strip() for chunk in chunks]
+        # Skip empty or unusable text instead of indexing it.
+        valid_chunks = []
+        for chunk in chunks:
+            text = chunk.get("text", "")
+            if isinstance(text, str) and text.strip():
+                cleaned = dict(chunk)
+                cleaned["text"] = text.strip()
+                valid_chunks.append(cleaned)
 
-        if any(not text for text in texts):
-            raise ValueError("Chunks must not contain empty text.")
+        if not valid_chunks:
+            raise ValueError(
+                "No chunks with usable text were provided."
+            )
+
+        texts = [chunk["text"] for chunk in valid_chunks]
 
         vectors = self.model.encode(
             texts,
@@ -33,12 +58,19 @@ class EvidenceRetriever:
 
         vectors = np.asarray(vectors, dtype=np.float32)
 
+        if vectors.ndim != 2 or vectors.shape[0] != len(valid_chunks):
+            raise ValueError(
+                "Embedding vectors do not match the chunk collection."
+            )
+
         if not np.isfinite(vectors).all():
-            raise ValueError("Embedding vectors contain invalid values.")
+            raise ValueError(
+                "Embedding vectors contain invalid values."
+            )
 
         self.index = faiss.IndexFlatIP(vectors.shape[1])
         self.index.add(vectors)
-        self.chunks = chunks
+        self.chunks = valid_chunks
 
     def search(
         self,
@@ -62,6 +94,14 @@ class EvidenceRetriever:
 
         query_vector = np.asarray(query_vector, dtype=np.float32)
 
+        if (
+            query_vector.ndim != 2
+            or query_vector.shape[0] != 1
+            or query_vector.shape[1] != self.index.d
+            or not np.isfinite(query_vector).all()
+        ):
+            raise ValueError("Invalid query embedding.")
+
         k = min(top_k, len(self.chunks))
         scores, indices = self.index.search(query_vector, k)
 
@@ -71,8 +111,14 @@ class EvidenceRetriever:
             if idx < 0:
                 continue
 
+            score = float(score)
+
+            # Exclude matches below the configured threshold.
+            if score < getattr(self, "min_similarity", 0.0):
+                continue
+
             result = dict(self.chunks[int(idx)])
-            result["similarity"] = float(score)
+            result["similarity"] = score
             results.append(result)
 
         return results

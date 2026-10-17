@@ -3,7 +3,9 @@ venv/
 .venv/
 __pycache__/
 *.py[cod]
-.env
+app/.env
 data/processed/
 logs/
 .pytest_cache/
+frontend/node_modules/
+frontend/.env

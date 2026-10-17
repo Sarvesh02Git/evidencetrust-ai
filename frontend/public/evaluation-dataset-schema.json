@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidenceTrust AI labelled claim-verification example",
+  "type": "object",
+  "required": ["id", "domain", "question", "claim", "expected_status", "expected_abstain", "evidence", "expected_evidence_ids"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "domain": {"type": "string", "description": "Document domain, e.g. information-security, privacy, public-policy"},
+    "question": {"type": "string", "minLength": 1},
+    "claim": {"type": "string", "description": "One atomic factual claim to verify"},
+    "expected_status": {"enum": ["supported", "contradicted", "partially_supported", "insufficient_evidence"]},
+    "expected_abstain": {"type": "boolean", "description": "Human-reviewed ground truth: should the verifier abstain on this claim?"},
+    "evidence": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "object", "required": ["source", "page", "chunk_id", "text"], "properties": {"source": {"type": "string"}, "page": {"type": "integer", "minimum": 1}, "chunk_id": {"type": "integer"}, "text": {"type": "string"}, "similarity": {"type": ["number", "null"]}}}},
+    "expected_evidence_ids": {"type": "array", "items": {"type": "integer", "minimum": 1}, "uniqueItems": true, "description": "1-based positions of the evidence items that a correct citation should select"}
+  },
+  "additionalProperties": false
+}

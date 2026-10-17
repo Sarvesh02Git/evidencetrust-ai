@@ -1,5 +1,6 @@
 
 import json
+import re
 
 from app.llm_client import GROQ_MODEL, get_groq_client
 
@@ -9,7 +10,32 @@ class ClaimExtractor:
         self.client = None
 
     def extract(self, answer: str) -> list[str]:
-        if not answer.strip():
+        if not answer or not answer.strip():
+            return []
+
+        normalized = re.sub(r"\s+", " ", answer).strip().lower()
+
+        # These are uncertainty messages, not factual claims.
+        
+        abstention_patterns = (
+            r"^there is insufficient evidence\b.*$",
+            r"^insufficient evidence\b.*$",
+            r"^the answer could not be fully verified\b.*$",
+            r"^i (?:cannot|can't) answer\b.*$",
+            r"^the available evidence (?:is|was) insufficient\b.*$",
+            r"^i do not have enough evidence\b.*$",
+            r"^there is not enough evidence\b.*$",
+            r"^unable to determine\b.*$",
+            r"^cannot determine\b.*$",
+            r"^i cannot determine\b.*$",
+            r"^the evidence does not establish\b.*$",
+        )
+
+
+        if any(
+            re.match(pattern, normalized)
+            for pattern in abstention_patterns
+        ):
             return []
 
         if self.client is None:
@@ -28,11 +54,17 @@ Preserve names, numbers, dates, and qualifications.
 Do not introduce new facts.
 Ignore conversational filler.
 
-Return JSON:
+If the answer only expresses uncertainty, abstention,
+or inability to verify, return an empty claims list.
+
+Return valid JSON:
 {"claims": ["claim one", "claim two"]}
 """,
                 },
-                {"role": "user", "content": answer},
+                {
+                    "role": "user",
+                    "content": answer,
+                },
             ],
         )
 
